@@ -6,6 +6,7 @@ import { useSound } from '../hooks/useSound';
 import GameBoard from '../components/GameBoard';
 import PlayerHand from '../components/PlayerHand';
 import DiscardPile from '../components/DiscardPile';
+import Card from '../components/Card';
 import OpponentSlot from '../components/OpponentSlot';
 import ColorPicker from '../components/ColorPicker';
 import UnoButton from '../components/UnoButton';
