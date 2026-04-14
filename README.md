@@ -2,14 +2,29 @@
 
 A real-time multiplayer UNO card game for 2–10 players, built with Node.js + Socket.IO on the backend and React + Tailwind CSS + Framer Motion on the frontend.
 
-## Stack
+## Technology Stack
 
-| Layer | Tech |
-|---|---|
-| Frontend | React 18, Vite, Tailwind CSS, Framer Motion, Zustand, React Router |
-| Backend | Node.js, Express, Socket.IO, Mongoose |
-| Testing | Vitest, fast-check (property-based), React Testing Library |
-| Database | MongoDB (optional — graceful fallback if not running) |
+### Frontend
+- **React 18** - Modern React with hooks and concurrent features
+- **Vite** - Fast build tool and development server
+- **Tailwind CSS** - Utility-first CSS framework with custom design system
+- **Framer Motion** - Production-ready motion library for animations
+- **Zustand** - Lightweight state management
+- **Socket.IO Client** - Real-time communication
+- **Web Audio API** - Procedural sound generation
+
+### Backend
+- **Node.js** - JavaScript runtime
+- **Express** - Web application framework
+- **Socket.IO** - Real-time bidirectional event-based communication
+- **Mongoose** - MongoDB object modeling (optional)
+- **Vitest** - Fast unit testing framework
+
+### Development & Testing
+- **Vitest** - Unit and integration testing
+- **fast-check** - Property-based testing
+- **React Testing Library** - Component testing utilities
+- **ESLint** - Code linting and formatting
 
 ## Project Structure
 
@@ -133,12 +148,44 @@ cd frontend && npm test
 
 ## Features
 
-- Create or join a room with a 6-character code
-- Full UNO ruleset: Skip, Reverse, Draw 2, Wild, Wild Draw 4
-- Real-time state sync via Socket.IO (server-authoritative)
-- Card visibility isolation — you only see your own hand
-- UNO call & challenge mechanic
-- In-game chat with rate limiting
-- Reconnection support (60-second grace window)
-- Responsive layout: arc layout on desktop, bottom-deck on mobile
-- Framer Motion card animations
+- **Modern Professional UI** - Clean, responsive design with glassmorphism effects
+- **Mobile-First Design** - Optimized for all devices with touch-friendly controls
+- **Enhanced Sound System** - Procedural audio with volume control and mute options
+- **Smooth Animations** - Consistent spring-based animations with reduced motion support
+- **Real-time multiplayer gameplay** - Play with friends in real-time using WebSockets
+- **Room-based lobbies** - Create or join game rooms with unique codes
+- **Complete UNO rules** - All standard UNO cards and rules implemented
+- **In-game chat** - Communicate with other players (desktop sidebar, mobile modal)
+- **Settings panel** - Control sound, volume, and game preferences
+- **Accessibility features** - Keyboard navigation, screen reader support, focus management
+- **Responsive layout** - Adaptive UI for mobile, tablet, and desktop
+- **Turn timer** - Visual countdown with audio warnings
+- **Enhanced card animations** - Smooth card play, draw, and hand management
+- **Professional color scheme** - Modern dark theme with accent colors
+
+## UI/UX Improvements
+
+### Mobile Optimizations
+- **Touch-friendly controls** - Larger tap targets and gesture support
+- **Responsive card sizing** - Cards scale appropriately for screen size
+- **Mobile chat modal** - Full-screen chat interface for mobile devices
+- **Optimized layouts** - Adaptive opponent arrangements and spacing
+- **Safe area support** - Proper handling of notches and rounded corners
+
+### Enhanced Animations
+- **Consistent timing** - Unified animation system with spring physics
+- **Performance optimized** - Reduced motion support and efficient rendering
+- **Visual feedback** - Clear hover states, loading indicators, and transitions
+- **Card interactions** - Smooth play, draw, and selection animations
+
+### Sound System
+- **Volume control** - Adjustable master volume with mute toggle
+- **Audio debouncing** - Prevents overlapping sounds and audio clipping
+- **Enhanced sound design** - Richer tones with harmonics and better timing
+- **Accessibility** - Audio cues for game state changes and user actions
+
+### Professional Design
+- **Modern color palette** - Carefully chosen colors with proper contrast
+- **Glassmorphism effects** - Subtle transparency and blur effects
+- **Consistent spacing** - Unified design system with proper hierarchy
+- **Typography** - Inter font family for better readability
