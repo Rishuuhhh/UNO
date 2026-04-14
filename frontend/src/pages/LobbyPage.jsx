@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from '../store/gameStore';
-import { useSocket } from '../hooks/useSocket';
+import { useSocket, clearSession } from '../hooks/useSocket';
+import ReconnectOverlay from '../components/ReconnectOverlay';
 
 const SPRING = { type: 'spring', stiffness: 360, damping: 26, mass: 0.9 };
 const EASE   = [0.25, 0.46, 0.45, 0.94];
 
 function LobbyPage() {
   const navigate = useNavigate();
-  const { socket, connected, reconnecting, connectionError } = useSocket(navigate);
+  const { socket, connected, reconnecting, reconnectCountdown, connectionError, rejoining } = useSocket(navigate);
   const { roomCode, players, error } = useGameStore();
 
   const [createName, setCreateName] = useState('');
@@ -23,6 +24,13 @@ function LobbyPage() {
   // Show connection error screen
   if (connectionError && !connected) {
     return (
+      <>
+        <ReconnectOverlay
+          reconnecting={reconnecting}
+          rejoining={rejoining}
+          countdown={reconnectCountdown}
+          onGiveUp={() => { clearSession(); window.location.reload(); }}
+        />
       <div style={{
         minHeight: '100vh', background: '#0f0f23',
         display: 'flex', flexDirection: 'column',
@@ -63,6 +71,7 @@ function LobbyPage() {
           </button>
         </motion.div>
       </div>
+      </>
     );
   }
 

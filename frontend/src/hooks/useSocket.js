@@ -11,83 +11,68 @@ let _socket = null;
 
 function getSocket() {
   if (!_socket) {
-    console.log('Creating new socket connection to:', SERVER_URL);
     _socket = io(SERVER_URL, {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 10000, // 10 second connection timeout
-    });
-    
-    _socket.on('connect', () => {
-      console.log('Socket connected successfully');
-    });
-    
-    _socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-    });
-    
-    _socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
+      timeout: 10000,
     });
   }
   return _socket;
 }
 
 // ─── Session helpers ──────────────────────────────────────────────────────────
-function saveSession(token, roomCode) {
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ token, roomCode }));
-  } catch (_) {}
+export function saveSession(token, roomCode) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token, roomCode })); } catch (_) {}
 }
 
-function loadSession() {
+export function loadSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch (_) {
-    return null;
-  }
+  } catch (_) { return null; }
 }
 
-function clearSession() {
-  try {
-    localStorage.removeItem(SESSION_KEY);
-  } catch (_) {}
+export function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
 }
 
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useSocket(navigate) {
   const socket = getSocket();
-  const [connected, setConnected] = useState(socket.connected);
-  const [reconnecting, setReconnecting] = useState(false);
+  const [connected, setConnected]               = useState(socket.connected);
+  const [reconnecting, setReconnecting]         = useState(false);
   const [reconnectCountdown, setReconnectCountdown] = useState(RECONNECT_TIMEOUT_S);
-  const [initializing, setInitializing] = useState(!socket.connected);
-  const [connectionError, setConnectionError] = useState(null);
+  const [connectionError, setConnectionError]   = useState(null);
+  // true while we're waiting for the server to confirm a rejoin attempt
+  const [rejoining, setRejoining]               = useState(false);
 
-  console.log('useSocket hook state:', { 
-    connected, 
-    reconnecting, 
-    initializing,
-    connectionError,
-    socketId: socket.id 
-  });
-  const countdownRef = useRef(null);
-  const navigateRef = useRef(navigate);
+  const countdownRef  = useRef(null);
+  const navigateRef   = useRef(navigate);
+  const rejoiningRef  = useRef(false); // sync ref so event handlers can read it
 
-  useEffect(() => {
-    navigateRef.current = navigate;
-  });
+  useEffect(() => { navigateRef.current = navigate; });
 
   const { reset } = useGameStore.getState();
 
   const resolveMyTurn = useCallback((gameState, socketId) => {
     if (!gameState || !socketId) return false;
-    const currentPlayer = gameState.players?.[gameState.currentTurnIndex];
-    return currentPlayer?.id === socketId;
+    const cp = gameState.players?.[gameState.currentTurnIndex];
+    return cp?.id === socketId;
+  }, []);
+
+  const stopCountdown = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setReconnecting(false);
+    setReconnectCountdown(RECONNECT_TIMEOUT_S);
   }, []);
 
   const startCountdown = useCallback(() => {
+    stopCountdown();
     setReconnecting(true);
     setReconnectCountdown(RECONNECT_TIMEOUT_S);
     let remaining = RECONNECT_TIMEOUT_S;
@@ -102,50 +87,40 @@ export function useSocket(navigate) {
         window.location.href = '/';
       }
     }, 1000);
-  }, [reset]);
-
-  const stopCountdown = useCallback(() => {
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-    setReconnecting(false);
-    setReconnectCountdown(RECONNECT_TIMEOUT_S);
-  }, []);
+  }, [reset, stopCountdown]);
 
   useEffect(() => {
-    // ── Connection lifecycle ──────────────────────────────────────────────
+    // ── Connection lifecycle ──────────────────────────────────────────────────
     const onConnect = () => {
-      console.log('Socket connected in useSocket hook');
       setConnected(true);
-      setInitializing(false);
       setConnectionError(null);
       stopCountdown();
 
-      // Attempt to rejoin if we have a saved session
+      // Attempt rejoin if we have a saved session — do NOT clear session here
       const session = loadSession();
       if (session?.token) {
+        setRejoining(true);
+        rejoiningRef.current = true;
         socket.emit('rejoin_room', { token: session.token });
       }
     };
 
     const onDisconnect = () => {
       setConnected(false);
-      startCountdown();
+      setRejoining(false);
+      rejoiningRef.current = false;
+      // Only start countdown if we have a session worth preserving
+      const session = loadSession();
+      if (session?.token) {
+        startCountdown();
+      }
     };
 
-    const onConnectError = (error) => {
-      console.error('Connection error:', error);
-      setConnectionError(error.message || 'Failed to connect to server');
-      setInitializing(false);
+    const onConnectError = (err) => {
+      setConnectionError(err.message || 'Failed to connect to server');
     };
 
-    const onReconnect = () => {
-      setConnected(true);
-      stopCountdown();
-    };
-
-    // ── Room / lobby events ───────────────────────────────────────────────
+    // ── Room / lobby events ───────────────────────────────────────────────────
     const onRoomCreated = ({ roomCode, sessionToken, lobbyState }) => {
       const store = useGameStore.getState();
       store.setRoomCode(roomCode);
@@ -158,6 +133,9 @@ export function useSocket(navigate) {
       const store = useGameStore.getState();
       store.setRoomCode(roomCode);
       if (sessionToken) saveSession(sessionToken, roomCode);
+      // If we were rejoining a lobby, stop the rejoining state
+      setRejoining(false);
+      rejoiningRef.current = false;
       if (navigateRef.current) navigateRef.current('/');
     };
 
@@ -165,29 +143,36 @@ export function useSocket(navigate) {
       useGameStore.getState().setPlayers(players ?? []);
     };
 
-    // ── Rejoin ────────────────────────────────────────────────────────────
+    // ── game_state_update — handles both live updates and rejoin restoration ──
     const onGameStateUpdate = ({ delta }) => {
       const store = useGameStore.getState();
       const current = store.gameState ?? {};
       const updated = { ...current, ...delta };
       store.setGameState(updated);
 
-      // If we rejoined mid-game, navigate to the game page
-      const session = loadSession();
-      if (updated.status === 'playing' && session?.roomCode) {
-        store.setRoomCode(session.roomCode);
-        if (navigateRef.current) navigateRef.current(`/game/${session.roomCode}`);
-      }
-
       if (delta?.myHand !== undefined) store.setMyHand(delta.myHand);
+      if (delta?.players)              store.setPlayers(delta.players);
       store.setMyTurn(resolveMyTurn(updated, socket.id));
+
+      // If this was a rejoin response, navigate to the game
+      if (rejoiningRef.current) {
+        setRejoining(false);
+        rejoiningRef.current = false;
+        const session = loadSession();
+        const roomCode = delta?.roomCode ?? session?.roomCode ?? updated?.roomCode;
+        if (updated.status === 'playing' && roomCode) {
+          store.setRoomCode(roomCode);
+          if (navigateRef.current) navigateRef.current(`/game/${roomCode}`);
+        }
+      }
     };
 
-    // ── Game events ───────────────────────────────────────────────────────
+    // ── Game events ───────────────────────────────────────────────────────────
     const onGameStarted = ({ myHand, gameState, roomCode: rc }) => {
       const store = useGameStore.getState();
       store.setGameState(gameState);
       store.setMyHand(myHand ?? []);
+      if (gameState?.players) store.setPlayers(gameState.players);
       store.setMyTurn(resolveMyTurn(gameState, socket.id));
       const code = rc ?? store.roomCode;
       if (navigateRef.current && code) navigateRef.current(`/game/${code}`);
@@ -200,63 +185,65 @@ export function useSocket(navigate) {
       clearSession();
     };
 
-    const onRoundStarted = ({ myHand, gameState, round }) => {
+    const onRoundStarted = ({ myHand, gameState }) => {
       const store = useGameStore.getState();
       store.setGameState(gameState);
       store.setMyHand(myHand ?? []);
+      if (gameState?.players) store.setPlayers(gameState.players);
       store.setMyTurn(resolveMyTurn(gameState, socket.id));
     };
 
-    // ── Errors ────────────────────────────────────────────────────────────
-    const onActionError = ({ message }) => useGameStore.getState().setError(message);
-    const onRoomError = ({ message }) => {
+    // ── Errors ────────────────────────────────────────────────────────────────
+    const onActionError     = ({ message }) => useGameStore.getState().setError(message);
+    const onRoomError       = ({ message }) => {
       useGameStore.getState().setError(message);
-      // If rejoin failed, clear stale session
-      if (message === 'Invalid reconnect token') clearSession();
+      if (message === 'Invalid reconnect token') {
+        clearSession();
+        setRejoining(false);
+        rejoiningRef.current = false;
+      }
     };
-    const onChatError = ({ message }) => useGameStore.getState().setError(message);
-    const onRateLimitError = ({ message }) => useGameStore.getState().setError(message);
-    const onChatMessage = (message) => useGameStore.getState().addChatMessage(message);
+    const onChatError       = ({ message }) => useGameStore.getState().setError(message);
+    const onRateLimitError  = ({ message }) => useGameStore.getState().setError(message);
+    const onChatMessage     = (message)     => useGameStore.getState().addChatMessage(message);
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('connect_error', onConnectError);
-    socket.on('reconnect', onReconnect);
-    socket.on('room_created', onRoomCreated);
+    socket.on('connect',           onConnect);
+    socket.on('disconnect',        onDisconnect);
+    socket.on('connect_error',     onConnectError);
+    socket.on('room_created',      onRoomCreated);
     socket.on('join_room_success', onJoinRoomSuccess);
-    socket.on('lobby_updated', onLobbyUpdated);
-    socket.on('game_started', onGameStarted);
+    socket.on('lobby_updated',     onLobbyUpdated);
+    socket.on('game_started',      onGameStarted);
     socket.on('game_state_update', onGameStateUpdate);
-    socket.on('game_over', onGameOver);
-    socket.on('round_started', onRoundStarted);
-    socket.on('action_error', onActionError);
-    socket.on('room_error', onRoomError);
-    socket.on('chat_error', onChatError);
-    socket.on('rate_limit_error', onRateLimitError);
-    socket.on('chat_message', onChatMessage);
+    socket.on('game_over',         onGameOver);
+    socket.on('round_started',     onRoundStarted);
+    socket.on('action_error',      onActionError);
+    socket.on('room_error',        onRoomError);
+    socket.on('chat_error',        onChatError);
+    socket.on('rate_limit_error',  onRateLimitError);
+    socket.on('chat_message',      onChatMessage);
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('connect_error', onConnectError);
-      socket.off('reconnect', onReconnect);
-      socket.off('room_created', onRoomCreated);
+      socket.off('connect',           onConnect);
+      socket.off('disconnect',        onDisconnect);
+      socket.off('connect_error',     onConnectError);
+      socket.off('room_created',      onRoomCreated);
       socket.off('join_room_success', onJoinRoomSuccess);
-      socket.off('lobby_updated', onLobbyUpdated);
-      socket.off('game_started', onGameStarted);
+      socket.off('lobby_updated',     onLobbyUpdated);
+      socket.off('game_started',      onGameStarted);
       socket.off('game_state_update', onGameStateUpdate);
-      socket.off('game_over', onGameOver);
-      socket.off('round_started', onRoundStarted);
-      socket.off('action_error', onActionError);
-      socket.off('room_error', onRoomError);
-      socket.off('chat_error', onChatError);
-      socket.off('rate_limit_error', onRateLimitError);
-      socket.off('chat_message', onChatMessage);
+      socket.off('game_over',         onGameOver);
+      socket.off('round_started',     onRoundStarted);
+      socket.off('action_error',      onActionError);
+      socket.off('room_error',        onRoomError);
+      socket.off('chat_error',        onChatError);
+      socket.off('rate_limit_error',  onRateLimitError);
+      socket.off('chat_message',      onChatMessage);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [resolveMyTurn, startCountdown, stopCountdown]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { socket, connected, reconnecting, reconnectCountdown, initializing, connectionError };
+  return { socket, connected, reconnecting, reconnectCountdown, connectionError, rejoining };
 }
 
 export default useSocket;

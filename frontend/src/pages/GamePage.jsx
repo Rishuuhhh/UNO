@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from '../store/gameStore';
-import { useSocket } from '../hooks/useSocket';
+import { useSocket, clearSession } from '../hooks/useSocket';
 import { useSound } from '../hooks/useSound';
 import GameBoard from '../components/GameBoard';
 import PlayerHand from '../components/PlayerHand';
@@ -10,6 +10,7 @@ import ColorPicker from '../components/ColorPicker';
 import UnoButton from '../components/UnoButton';
 import ChatPanel from '../components/ChatPanel';
 import SettingsPanel from '../components/SettingsPanel';
+import ReconnectOverlay from '../components/ReconnectOverlay';
 
 const WILD_VALUES = new Set(['wild', 'wild4']);
 
@@ -24,7 +25,7 @@ function useIsMobile() {
 }
 
 export default function GamePage() {
-  const { socket } = useSocket();
+  const { socket, reconnecting, reconnectCountdown, rejoining } = useSocket();
   const { gameState, myHand, players, myTurn, chatMessages, error } = useGameStore();
   const setError = useGameStore((s) => s.setError);
   const { play } = useSound();
@@ -240,14 +241,24 @@ export default function GamePage() {
       style={{ background: '#0f0f23' }}
       data-testid="game-page"
     >
-      {/* Turn timer bar */}
+      {/* Reconnect / rejoin overlay */}
+      <ReconnectOverlay
+        reconnecting={reconnecting}
+        rejoining={rejoining}
+        countdown={reconnectCountdown}
+        onGiveUp={() => { clearSession(); window.location.href = '/'; }}
+      />
+
+      {/* Turn timer bar — top edge */}
       {myTurn && gameState?.turnTimeLimit && (
-        <div className="absolute top-0 left-0 right-0 z-40 h-1">
-          <motion.div
-            className={`h-full ${secondsLeft <= 10 ? 'bg-red-500' : 'bg-indigo-500'}`}
-            style={{ width: `${(secondsLeft / gameState.turnTimeLimit) * 100}%` }}
-            animate={secondsLeft <= 10 ? { opacity: [1, 0.6, 1] } : {}}
-            transition={secondsLeft <= 10 ? { repeat: Infinity, duration: 0.5 } : {}}
+        <div className="absolute top-0 left-0 right-0 z-40" style={{ height: 3 }}>
+          <div
+            style={{
+              height: '100%',
+              width: `${(secondsLeft / gameState.turnTimeLimit) * 100}%`,
+              background: secondsLeft <= 10 ? '#ef4444' : '#6366f1',
+              transition: 'width 1s linear, background 0.3s',
+            }}
           />
         </div>
       )}
@@ -261,8 +272,10 @@ export default function GamePage() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16, scale: 0.94 }}
             transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl"
+            className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl"
             style={{
+              top: isMobile ? 8 : 12,
+              maxWidth: isMobile ? 'calc(100vw - 32px)' : 400,
               background: 'rgba(127,29,29,0.9)', backdropFilter: 'blur(12px)',
               border: '1px solid rgba(239,68,68,0.4)',
               boxShadow: '0 0 20px rgba(239,68,68,0.3), 0 8px 24px rgba(0,0,0,0.5)',
@@ -270,10 +283,10 @@ export default function GamePage() {
             role="alert"
             data-testid="error-toast"
           >
-            <span style={{ fontSize: 13, color: 'rgba(254,202,202,0.95)' }}>{toastError}</span>
+            <span style={{ fontSize: 13, color: 'rgba(254,202,202,0.95)', flex: 1 }}>{toastError}</span>
             <button
               onClick={dismissToast}
-              style={{ color: 'rgba(252,165,165,0.7)', fontWeight: 900, fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}
+              style={{ color: 'rgba(252,165,165,0.7)', fontWeight: 900, fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}
             >×</button>
           </motion.div>
         )}
@@ -292,48 +305,47 @@ export default function GamePage() {
       {/* Settings */}
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
-      {/* Settings button */}
-      <button
-        onClick={() => setShowSettings(true)}
-        className="absolute z-30 glass rounded-full flex items-center justify-center"
-        style={{ top: 12, right: isMobile ? 12 : 16, width: 36, height: 36 }}
-        aria-label="Settings"
+      {/* Top-right action buttons */}
+      <div
+        className="absolute z-30 flex items-center gap-2"
+        style={{ top: 10, right: 10 }}
       >
-        <span style={{ fontSize: 16 }}>⚙️</span>
-      </button>
-
-      {/* Mobile chat button */}
-      {isMobile && (
+        {isMobile && (
+          <button
+            onClick={() => setShowChat(true)}
+            className="glass rounded-full flex items-center justify-center"
+            style={{ width: 34, height: 34, fontSize: 15 }}
+            aria-label="Chat"
+          >💬</button>
+        )}
         <button
-          onClick={() => setShowChat(true)}
-          className="absolute z-30 glass rounded-full flex items-center justify-center"
-          style={{ top: 12, right: 56, width: 36, height: 36 }}
-          aria-label="Chat"
-        >
-          <span style={{ fontSize: 16 }}>💬</span>
-        </button>
-      )}
+          onClick={() => setShowSettings(true)}
+          className="glass rounded-full flex items-center justify-center"
+          style={{ width: 34, height: 34, fontSize: 15 }}
+          aria-label="Settings"
+        >⚙️</button>
+      </div>
 
-      {/* Main layout: game board + chat sidebar */}
+      {/* Main layout */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* Game board column */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-          {/* Board (opponents + center) */}
+          {/* Board: opponents + center piles */}
           <GameBoard gameState={gameState} myId={myId} opponents={opponents}>
 
             {/* Discard pile */}
             <DiscardPile topCard={topCard} />
 
             {/* Draw pile */}
-            <div className="flex flex-col items-center gap-2">
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 3, fontWeight: 600 }}>Draw</span>
+            <div className="flex flex-col items-center" style={{ gap: 4 }}>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600 }}>Draw</span>
 
-              {/* Timer bar under draw pile */}
+              {/* Timer bar */}
               {gameState?.turnStartedAt && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <div style={{ width: 48, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                  <div style={{ width: isMobile ? 40 : 48, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%',
                       width: `${Math.max(0, (secondsLeft / (gameState.turnTimeLimit ?? 30)) * 100)}%`,
@@ -342,79 +354,81 @@ export default function GamePage() {
                       transition: 'width 1s linear, background 0.3s',
                     }} />
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: secondsLeft <= 10 ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: secondsLeft <= 10 ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>
                     {secondsLeft}s
                   </span>
                 </div>
               )}
 
               {/* Draw pile stack */}
-              <div className="relative" style={{ width: 64, height: 96 }}>
-                {[3, 2, 1].map((offset) => (
-                  <div key={offset} style={{
-                    position: 'absolute',
-                    top: -offset * 1.5, left: offset * 1,
-                    width: 64, height: 96, borderRadius: 10,
-                    background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
-                    border: '1px solid rgba(150,130,255,0.2)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                  }} />
-                ))}
-
-                <motion.div
-                  key={drawAnimKey}
-                  style={{ position: 'absolute', top: 0, left: 0, cursor: myTurn ? 'pointer' : 'default' }}
-                  onClick={handleDrawCard}
-                  data-testid="draw-pile"
-                  aria-label="Draw a card"
-                  whileHover={myTurn ? { y: -8, scale: 1.06 } : {}}
-                  whileTap={myTurn ? { scale: 0.94 } : {}}
-                  animate={drawAnimKey > 0 ? { y: [0, -12, 0] } : {}}
-                  transition={{ duration: 0.3 }}
-                >
-                  {/* Card back */}
-                  <div style={{
-                    width: 64, height: 96, borderRadius: 10,
-                    background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)',
-                    border: '1.5px solid rgba(150,130,255,0.4)',
-                    boxShadow: myTurn
-                      ? '0 0 20px rgba(99,102,241,0.5), 0 6px 20px rgba(0,0,0,0.6)'
-                      : '0 4px 16px rgba(0,0,0,0.6)',
-                    position: 'relative', overflow: 'hidden',
-                    transition: 'box-shadow 0.3s ease',
-                  }}>
-                    <div style={{
-                      position: 'absolute', inset: 4, borderRadius: 7,
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      backgroundImage: 'repeating-linear-gradient(45deg,rgba(255,255,255,0.02) 0px,rgba(255,255,255,0.02) 2px,transparent 2px,transparent 6px)',
-                    }} />
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontWeight: 900, fontSize: 14, color: 'rgba(255,255,255,0.25)', letterSpacing: 1 }}>UNO</span>
-                    </div>
-                    {myTurn && (
-                      <div style={{
-                        position: 'absolute', inset: 0, borderRadius: 10,
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, transparent 60%)',
+              {(() => {
+                const W = isMobile ? 48 : 64;
+                const H = isMobile ? 72 : 96;
+                const R = isMobile ? 8 : 10;
+                return (
+                  <div style={{ position: 'relative', width: W, height: H }}>
+                    {[3, 2, 1].map((offset) => (
+                      <div key={offset} style={{
+                        position: 'absolute',
+                        top: -offset * 1.5, left: offset * 1,
+                        width: W, height: H, borderRadius: R,
+                        background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+                        border: '1px solid rgba(150,130,255,0.2)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                       }} />
-                    )}
+                    ))}
+                    <motion.div
+                      key={drawAnimKey}
+                      style={{ position: 'absolute', top: 0, left: 0, cursor: myTurn ? 'pointer' : 'default' }}
+                      onClick={handleDrawCard}
+                      data-testid="draw-pile"
+                      aria-label="Draw a card"
+                      whileHover={myTurn ? { y: -6, scale: 1.05 } : {}}
+                      whileTap={myTurn ? { scale: 0.94 } : {}}
+                      animate={drawAnimKey > 0 ? { y: [0, -10, 0] } : {}}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <div style={{
+                        width: W, height: H, borderRadius: R,
+                        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)',
+                        border: `1.5px solid ${myTurn ? 'rgba(99,102,241,0.6)' : 'rgba(150,130,255,0.35)'}`,
+                        boxShadow: myTurn
+                          ? '0 0 16px rgba(99,102,241,0.45), 0 4px 16px rgba(0,0,0,0.6)'
+                          : '0 4px 14px rgba(0,0,0,0.6)',
+                        position: 'relative', overflow: 'hidden',
+                        transition: 'border-color 0.3s, box-shadow 0.3s',
+                      }}>
+                        <div style={{
+                          position: 'absolute', inset: 4, borderRadius: R - 3,
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          backgroundImage: 'repeating-linear-gradient(45deg,rgba(255,255,255,0.02) 0px,rgba(255,255,255,0.02) 2px,transparent 2px,transparent 6px)',
+                        }} />
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontWeight: 900, fontSize: isMobile ? 11 : 13, color: 'rgba(255,255,255,0.22)', letterSpacing: 1 }}>UNO</span>
+                        </div>
+                      </div>
+                    </motion.div>
                   </div>
-                </motion.div>
-              </div>
+                );
+              })()}
 
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600 }}>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 600 }}>
                 {gameState?.drawPile?.length ?? 0} left
               </span>
             </div>
           </GameBoard>
 
-          {/* Player hand */}
+          {/* Player hand — fixed at bottom of board column */}
           <div style={{
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(20px)',
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(16px)',
             borderTop: '1px solid rgba(255,255,255,0.07)',
-            padding: isMobile ? '6px 8px' : '8px 12px',
-            position: 'relative', zIndex: 2,
+            padding: isMobile ? '4px 4px 8px' : '6px 8px 10px',
             flexShrink: 0,
+            position: 'relative',
+            zIndex: 2,
+            // Safe area for notched phones
+            paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : 10,
           }}>
             <PlayerHand
               cards={myHand}
@@ -427,7 +441,7 @@ export default function GamePage() {
         {/* Chat sidebar — desktop only */}
         {!isMobile && (
           <div style={{
-            width: 260,
+            width: 240,
             borderLeft: '1px solid rgba(255,255,255,0.07)',
             background: 'rgba(0,0,0,0.4)',
             backdropFilter: 'blur(20px)',
@@ -441,8 +455,15 @@ export default function GamePage() {
         )}
       </div>
 
-      {/* UNO button */}
-      <div className="absolute z-40" style={{ bottom: isMobile ? 100 : 120, right: isMobile ? 12 : 20 }}>
+      {/* UNO button — above the hand */}
+      <div
+        className="absolute z-40"
+        style={{
+          // Position above the hand area; hand is ~90px on mobile, ~110px on desktop
+          bottom: isMobile ? 'calc(max(8px, env(safe-area-inset-bottom)) + 88px)' : 118,
+          right: isMobile ? 10 : 16,
+        }}
+      >
         <UnoButton visible={myHand.length === 1} onUnoCall={handleUnoCall} />
       </div>
 
@@ -459,7 +480,12 @@ export default function GamePage() {
           >
             <motion.div
               className="absolute bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden"
-              style={{ height: '60vh', background: 'rgba(15,15,35,0.98)', border: '1px solid rgba(255,255,255,0.1)' }}
+              style={{
+                height: '55vh',
+                background: 'rgba(15,15,35,0.98)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+              }}
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
