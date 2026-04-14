@@ -10,6 +10,7 @@ import {
   isValidMove,
   isWild4Legal,
   applyCardEffect,
+  nextTurn,
   checkWin,
   calculateScore,
   drawCard as engineDrawCard,
@@ -389,6 +390,7 @@ export async function drawCard(socketId) {
   const drawnCard = handAfter.find(c => !handBefore.some(hc => hc.id === c.id)) || null;
 
   // Reset unoCalled for the drawing player (Requirement 5.5)
+  // and advance the turn after drawing
   const stateWithReset = {
     ...stateAfter,
     players: stateAfter.players.map((p, i) => {
@@ -397,8 +399,11 @@ export async function drawCard(socketId) {
     }),
   };
 
-  room.gameState = { ...stateWithReset, updatedAt: Date.now() };
-  room.players = stateWithReset.players;
+  // Advance turn after drawing — in standard UNO you draw one card then pass
+  const stateWithNextTurn = nextTurn(stateWithReset);
+
+  room.gameState = { ...stateWithNextTurn, updatedAt: Date.now() };
+  room.players = stateWithNextTurn.players;
 
   await persistRoom(room);
 
