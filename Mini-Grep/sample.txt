@@ -1,4 +1,0 @@
-hello world
-this is an error
-another line
-error occurred again
