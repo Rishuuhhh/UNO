@@ -133,6 +133,7 @@ export function registerSocketHandlers(io, socket) {
 
       socket.emit('join_room_success', {
         sessionToken: socket.data.sessionToken,
+        roomCode: room.roomCode,
       });
 
       io.to(room.roomCode).emit('lobby_updated', buildLobbyPayload(room));
@@ -188,7 +189,6 @@ export function registerSocketHandlers(io, socket) {
     try {
       const room = rejoinRoom(socket.id, payload.token);
 
-      // Restore session token
       socket.data.sessionToken = randomUUID();
 
       await socket.join(room.roomCode);
@@ -196,9 +196,13 @@ export function registerSocketHandlers(io, socket) {
       const gameState = room.gameState;
       if (gameState) {
         const clientState = sanitizeStateForPlayer(gameState, socket.id);
-        socket.emit('game_state_update', { delta: clientState });
+        socket.emit('game_state_update', { delta: { ...clientState, roomCode: room.roomCode } });
       } else {
-        socket.emit('lobby_updated', buildLobbyPayload(room));
+        socket.emit('join_room_success', {
+          sessionToken: socket.data.sessionToken,
+          roomCode: room.roomCode,
+        });
+        io.to(room.roomCode).emit('lobby_updated', buildLobbyPayload(room));
       }
     } catch (err) {
       handleRoomManagerError(socket, err);

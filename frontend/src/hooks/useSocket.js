@@ -3,13 +3,10 @@ import { io } from 'socket.io-client';
 import useGameStore from '../store/gameStore';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-
-// Reconnection overlay countdown duration in seconds
 const RECONNECT_TIMEOUT_S = 60;
+const SESSION_KEY = 'uno_session'; // { token, roomCode }
 
-// ─── Singleton socket instance ────────────────────────────────────────────────
-// Created once for the lifetime of the app so navigating between pages
-// does NOT create a new connection and lose room/game state.
+// ─── Singleton socket ─────────────────────────────────────────────────────────
 let _socket = null;
 
 function getSocket() {
@@ -24,6 +21,28 @@ function getSocket() {
   return _socket;
 }
 
+// ─── Session helpers ──────────────────────────────────────────────────────────
+function saveSession(token, roomCode) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token, roomCode }));
+  } catch (_) {}
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch (_) {}
+}
+
 export function useSocket(navigate) {
   const socket = getSocket();
   const [connected, setConnected] = useState(socket.connected);
@@ -32,14 +51,12 @@ export function useSocket(navigate) {
   const countdownRef = useRef(null);
   const navigateRef = useRef(navigate);
 
-  // Keep navigateRef in sync with the latest navigate function
   useEffect(() => {
     navigateRef.current = navigate;
   });
 
   const { reset } = useGameStore.getState();
 
-  // Determine if it's the current player's turn
   const resolveMyTurn = useCallback((gameState, socketId) => {
     if (!gameState || !socketId) return false;
     const currentPlayer = gameState.players?.[gameState.currentTurnIndex];
@@ -49,7 +66,6 @@ export function useSocket(navigate) {
   const startCountdown = useCallback(() => {
     setReconnecting(true);
     setReconnectCountdown(RECONNECT_TIMEOUT_S);
-
     let remaining = RECONNECT_TIMEOUT_S;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
@@ -57,6 +73,7 @@ export function useSocket(navigate) {
       if (remaining <= 0) {
         clearInterval(countdownRef.current);
         countdownRef.current = null;
+        clearSession();
         reset();
         window.location.href = '/';
       }
@@ -73,10 +90,16 @@ export function useSocket(navigate) {
   }, []);
 
   useEffect(() => {
-    // ── Connection lifecycle ────────────────────────────────────────────────
+    // ── Connection lifecycle ──────────────────────────────────────────────
     const onConnect = () => {
       setConnected(true);
       stopCountdown();
+
+      // Attempt to rejoin if we have a saved session
+      const session = loadSession();
+      if (session?.token) {
+        socket.emit('rejoin_room', { token: session.token });
+      }
     };
 
     const onDisconnect = () => {
@@ -89,52 +112,68 @@ export function useSocket(navigate) {
       stopCountdown();
     };
 
-    // ── Server → Client events ──────────────────────────────────────────────
-    const onRoomCreated = ({ roomCode, lobbyState }) => {
+    // ── Room / lobby events ───────────────────────────────────────────────
+    const onRoomCreated = ({ roomCode, sessionToken, lobbyState }) => {
       const store = useGameStore.getState();
       store.setRoomCode(roomCode);
-      if (lobbyState?.players) {
-        store.setPlayers(lobbyState.players);
-      }
-      if (navigateRef.current) {
-        navigateRef.current(`/`);
-      }
+      if (lobbyState?.players) store.setPlayers(lobbyState.players);
+      if (sessionToken) saveSession(sessionToken, roomCode);
+      if (navigateRef.current) navigateRef.current('/');
+    };
+
+    const onJoinRoomSuccess = ({ roomCode, sessionToken }) => {
+      const store = useGameStore.getState();
+      store.setRoomCode(roomCode);
+      if (sessionToken) saveSession(sessionToken, roomCode);
+      if (navigateRef.current) navigateRef.current('/');
     };
 
     const onLobbyUpdated = ({ players }) => {
       useGameStore.getState().setPlayers(players ?? []);
     };
 
+    // ── Rejoin ────────────────────────────────────────────────────────────
+    const onGameStateUpdate = ({ delta }) => {
+      const store = useGameStore.getState();
+      const current = store.gameState ?? {};
+      const updated = { ...current, ...delta };
+      store.setGameState(updated);
+
+      // If we rejoined mid-game, navigate to the game page
+      const session = loadSession();
+      if (updated.status === 'playing' && session?.roomCode) {
+        store.setRoomCode(session.roomCode);
+        if (navigateRef.current) navigateRef.current(`/game/${session.roomCode}`);
+      }
+
+      if (delta?.myHand !== undefined) store.setMyHand(delta.myHand);
+      store.setMyTurn(resolveMyTurn(updated, socket.id));
+    };
+
+    // ── Game events ───────────────────────────────────────────────────────
     const onGameStarted = ({ myHand, gameState, roomCode: rc }) => {
       const store = useGameStore.getState();
       store.setGameState(gameState);
       store.setMyHand(myHand ?? []);
       store.setMyTurn(resolveMyTurn(gameState, socket.id));
       const code = rc ?? store.roomCode;
-      if (navigateRef.current && code) {
-        navigateRef.current(`/game/${code}`);
-      }
-    };
-
-    const onGameStateUpdate = ({ delta }) => {
-      const store = useGameStore.getState();
-      const current = store.gameState ?? {};
-      const updated = { ...current, ...delta };
-      store.setGameState(updated);
-      if (delta?.myHand !== undefined) {
-        store.setMyHand(delta.myHand);
-      }
-      store.setMyTurn(resolveMyTurn(updated, socket.id));
+      if (navigateRef.current && code) navigateRef.current(`/game/${code}`);
     };
 
     const onGameOver = (payload) => {
       const store = useGameStore.getState();
       store.setGameState({ ...(store.gameState ?? {}), ...payload, status: 'finished' });
       store.setMyTurn(false);
+      clearSession();
     };
 
+    // ── Errors ────────────────────────────────────────────────────────────
     const onActionError = ({ message }) => useGameStore.getState().setError(message);
-    const onRoomError = ({ message }) => useGameStore.getState().setError(message);
+    const onRoomError = ({ message }) => {
+      useGameStore.getState().setError(message);
+      // If rejoin failed, clear stale session
+      if (message === 'Invalid reconnect token') clearSession();
+    };
     const onChatError = ({ message }) => useGameStore.getState().setError(message);
     const onRateLimitError = ({ message }) => useGameStore.getState().setError(message);
     const onChatMessage = (message) => useGameStore.getState().addChatMessage(message);
@@ -143,6 +182,7 @@ export function useSocket(navigate) {
     socket.on('disconnect', onDisconnect);
     socket.on('reconnect', onReconnect);
     socket.on('room_created', onRoomCreated);
+    socket.on('join_room_success', onJoinRoomSuccess);
     socket.on('lobby_updated', onLobbyUpdated);
     socket.on('game_started', onGameStarted);
     socket.on('game_state_update', onGameStateUpdate);
@@ -158,6 +198,7 @@ export function useSocket(navigate) {
       socket.off('disconnect', onDisconnect);
       socket.off('reconnect', onReconnect);
       socket.off('room_created', onRoomCreated);
+      socket.off('join_room_success', onJoinRoomSuccess);
       socket.off('lobby_updated', onLobbyUpdated);
       socket.off('game_started', onGameStarted);
       socket.off('game_state_update', onGameStateUpdate);
@@ -171,12 +212,7 @@ export function useSocket(navigate) {
     };
   }, [resolveMyTurn, startCountdown, stopCountdown]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return {
-    socket,
-    connected,
-    reconnecting,
-    reconnectCountdown,
-  };
+  return { socket, connected, reconnecting, reconnectCountdown };
 }
 
 export default useSocket;
