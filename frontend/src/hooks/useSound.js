@@ -329,33 +329,3 @@ export function useSound() {
     getVolume: soundManager.getVolume
   };
 }
-    const now = ctx.currentTime;
-    const notes = [523, 659, 784]; // C5, E5, G5
-    notes.forEach((freq, i) => {
-      playTone({ freqStart: freq, freqEnd: freq, duration: 0.22, gainPeak: 0.3, startTime: now + i * 0.18 });
-    });
-  },
-
-  timeWarning() {
-    // Urgent beep
-    playTone({ type: 'square', freqStart: 880, freqEnd: 880, duration: 0.12, gainPeak: 0.3 });
-  },
-
-  roundEnd() {
-    // Descending tone
-    playTone({ type: 'sine', freqStart: 700, freqEnd: 300, duration: 0.28, gainPeak: 0.3 });
-  },
-};
-
-export function useSound() {
-  const play = (soundName) => {
-    try {
-      if (sounds[soundName]) sounds[soundName]();
-    } catch (e) {
-      // Silently ignore audio errors
-    }
-  };
-  return { play };
-}
-
-export default useSound;

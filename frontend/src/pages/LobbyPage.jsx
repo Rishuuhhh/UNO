@@ -8,45 +8,9 @@ const SPRING = { type: 'spring', stiffness: 360, damping: 26, mass: 0.9 };
 const EASE   = [0.25, 0.46, 0.45, 0.94];
 
 function LobbyPage() {
-  console.log('LobbyPage rendering...');
-  
-  const navigate = useNavigate();
-  const { socket, connected, reconnecting } = useSocket(navigate);
-  const { roomCode, players, error } = useGameStore();
-
-  console.log('LobbyPage state:', { 
-    socket: !!socket, 
-    socketConnected: connected,
-    reconnecting,
-    roomCode, 
-    playersCount: players.length, 
-    error 
-  });
-
-  const [createName, setCreateName] = useState('');
-  const [joinName,   setJoinName]   = useState('');
-  const [joinCode,   setJoinCode]   = useState('');
-
-  const myId    = socket?.id;
-  const isHost  = players.length > 0 && players[0]?.id === myId;
-  const canStart = players.length >= 2;
-
-function LobbyPage() {
-  console.log('LobbyPage rendering...');
-  
   const navigate = useNavigate();
   const { socket, connected, reconnecting, connectionError } = useSocket(navigate);
   const { roomCode, players, error } = useGameStore();
-
-  console.log('LobbyPage state:', { 
-    socket: !!socket, 
-    socketConnected: connected,
-    reconnecting,
-    connectionError,
-    roomCode, 
-    playersCount: players.length, 
-    error 
-  });
 
   const [createName, setCreateName] = useState('');
   const [joinName,   setJoinName]   = useState('');
@@ -60,15 +24,10 @@ function LobbyPage() {
   if (connectionError && !connected) {
     return (
       <div style={{
-        minHeight: '100vh', 
-        background: '#080810',
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        padding: 16,
-        color: '#fff',
-        fontFamily: 'Poppins, sans-serif'
+        minHeight: '100vh', background: '#0f0f23',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: 16, color: '#fff',
       }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -83,30 +42,21 @@ function LobbyPage() {
             Unable to connect to the game server
           </p>
           <div style={{
-            background: 'rgba(239,68,68,0.15)',
-            border: '1px solid rgba(239,68,68,0.4)',
-            borderRadius: 12,
-            padding: 16,
-            marginBottom: 20,
-            color: 'rgba(252,165,165,0.9)',
-            fontSize: 14
+            background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
+            borderRadius: 12, padding: 16, marginBottom: 20,
+            color: 'rgba(252,165,165,0.9)', fontSize: 14,
           }}>
             {connectionError}
           </div>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 20 }}>
             Make sure the backend server is running on: {import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}
           </p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             style={{
-              background: '#3b82f6',
-              color: '#fff',
-              border: 'none',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 14
+              background: '#3b82f6', color: '#fff', border: 'none',
+              padding: '12px 24px', borderRadius: 8, cursor: 'pointer',
+              fontWeight: 600, fontSize: 14,
             }}
           >
             Retry Connection
@@ -120,15 +70,10 @@ function LobbyPage() {
   if (!connected && !reconnecting) {
     return (
       <div style={{
-        minHeight: '100vh', 
-        background: '#080810',
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        padding: 16,
-        color: '#fff',
-        fontFamily: 'Poppins, sans-serif'
+        minHeight: '100vh', background: '#0f0f23',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: 16, color: '#fff',
       }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -141,26 +86,20 @@ function LobbyPage() {
             <span style={{ color: '#3b82f6' }}>N</span>
             <span style={{ color: '#eab308' }}>O</span>
           </h1>
-          <div style={{ 
-            width: 40, 
-            height: 40, 
+          <div style={{
+            width: 40, height: 40,
             border: '3px solid rgba(255,255,255,0.1)',
             borderTop: '3px solid #3b82f6',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px'
+            margin: '0 auto 20px',
           }} />
           <p style={{ color: 'rgba(255,255,255,0.7)' }}>Connecting to server...</p>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 10 }}>
-            Server: {import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}
+            {import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}
           </p>
         </motion.div>
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
+        <style>{`@keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }`}</style>
       </div>
     );
   }
@@ -180,21 +119,19 @@ function LobbyPage() {
     if (socket && isHost && canStart) socket.emit('start_game', { roomCode });
   };
 
-  // ── Shared input style ──────────────────────────────────────────────────────
   const inputStyle = {
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 12, padding: '10px 16px',
     color: '#fff', fontSize: 14, outline: 'none', width: '100%',
     transition: 'border-color 0.18s ease',
-    fontFamily: 'Poppins, sans-serif',
   };
 
   // ── Waiting room ────────────────────────────────────────────────────────────
   if (roomCode) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#080810',
+        minHeight: '100vh', background: '#0f0f23',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}>
         <motion.div
@@ -202,18 +139,15 @@ function LobbyPage() {
           animate={{ opacity: 1, y: 0,  scale: 1    }}
           transition={SPRING}
           style={{
-            background: 'rgba(255,255,255,0.04)',
-            backdropFilter: 'blur(20px)',
+            background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.09)',
             borderRadius: 24, padding: '36px 32px',
             width: '100%', maxWidth: 440,
-            boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-            color: '#fff',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.6)', color: '#fff',
           }}
         >
           <h1 style={{ fontSize: 28, fontWeight: 800, textAlign: 'center', marginBottom: 4 }}>Lobby</h1>
 
-          {/* Room code */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>Room Code</p>
             <motion.p
@@ -226,7 +160,6 @@ function LobbyPage() {
             </motion.p>
           </div>
 
-          {/* Error */}
           <AnimatePresence>
             {error && (
               <motion.div
@@ -246,7 +179,6 @@ function LobbyPage() {
             )}
           </AnimatePresence>
 
-          {/* Player list */}
           <div style={{ marginBottom: 24 }}>
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
               Players ({players.length}/10)
@@ -281,7 +213,6 @@ function LobbyPage() {
             </ul>
           </div>
 
-          {/* Start / waiting */}
           {isHost ? (
             <motion.button
               onClick={handleStart}
@@ -313,11 +244,10 @@ function LobbyPage() {
   // ── Create / Join ───────────────────────────────────────────────────────────
   return (
     <div style={{
-      minHeight: '100vh', background: '#080810',
+      minHeight: '100vh', background: '#0f0f23',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: 16, gap: 20, color: '#fff',
     }}>
-      {/* Title */}
       <motion.h1
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -330,7 +260,6 @@ function LobbyPage() {
         <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 400, fontSize: 24, marginLeft: 12 }}>Multiplayer</span>
       </motion.h1>
 
-      {/* Error */}
       <AnimatePresence>
         {error && (
           <motion.div

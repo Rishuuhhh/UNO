@@ -149,6 +149,11 @@ body {
   }
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* Playable Card Animation */
 .playable-card {
   animation: pulse-ring 2s ease-in-out infinite;
@@ -224,31 +229,6 @@ body {
 
 .transition-bounce {
   transition: all var(--duration-normal) cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-  100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
-}
-.pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
-
-/* UNO button pulse */
-@keyframes uno-pulse {
-  0%, 100% { transform: scale(1);    box-shadow: 0 0 20px rgba(239,68,68,0.5); }
-  50%       { transform: scale(1.06); box-shadow: 0 0 35px rgba(239,68,68,0.9); }
-}
-.uno-pulse { animation: uno-pulse 0.9s ease-in-out infinite; }
-
-/* Floating particles */
-@keyframes float-up {
-  0%   { transform: translateY(0) rotate(0deg);   opacity: 0.6; }
-  100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
-}
-
-/* Table felt ring */
-.table-felt {
-  background: radial-gradient(ellipse 70% 45% at 50% 50%,
-    rgba(10, 40, 15, 0.35) 0%,
-    rgba(5, 20, 8, 0.15) 60%,
-    transparent 100%);
-  pointer-events: none;
 }
 
 /* Playable card ring */

@@ -177,16 +177,3 @@ export default function PlayerHand({ cards = [], playableCardIds = new Set(), on
     </div>
   );
 }
-                card={card}
-                playable={playableCardIds.has(card.id)}
-                onClick={onPlayCard}
-                draggable={playableCardIds.has(card.id)}
-                animate={newIds.has(card.id)}
-              />
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
-  );
-}
