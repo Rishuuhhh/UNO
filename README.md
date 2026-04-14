@@ -35,6 +35,15 @@ uno/
 - Node.js 18+
 - MongoDB (optional — the server runs without it, persistence is skipped)
 
+### Quick Start
+
+**Option 1: Use the startup script (Recommended)**
+```bash
+./start-dev.sh
+```
+
+**Option 2: Manual startup**
+
 ### Install dependencies
 
 ```bash
@@ -59,6 +68,49 @@ npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## Troubleshooting Black Screen Issues
+
+If you see a black screen when starting the game, check the following:
+
+### 1. Check Browser Console
+Open your browser's developer tools (F12) and look for error messages in the console.
+
+### 2. Verify Backend Server is Running
+Make sure the backend server is running on port 3001:
+- Check terminal output for "Listening on port 3001"
+- Visit http://localhost:3001/health - should return `{"status":"ok"}`
+
+### 3. Check Network Connection
+The frontend tries to connect to the backend via WebSocket. If you see connection errors:
+- Ensure both servers are running
+- Check if port 3001 is available
+- Verify no firewall is blocking the connection
+
+### 4. Common Issues and Solutions
+
+**Black screen with no errors:**
+- Backend server not running → Start with `cd backend && npm run dev`
+- Port conflict → Check if port 3001 is in use
+
+**"Connection Failed" message:**
+- Backend server not accessible → Verify server is running and accessible
+- Wrong server URL → Check VITE_SERVER_URL environment variable
+
+**Loading screen stuck:**
+- Network timeout → Check internet connection and server status
+- CORS issues → Verify backend CORS configuration
+
+**Canvas/WebGL errors:**
+- Browser compatibility → Try a different browser
+- Hardware acceleration disabled → Enable in browser settings
+
+### 5. Debug Mode
+The app now includes detailed logging. Check the browser console for:
+- "Main.jsx loading..."
+- "App component rendering..."
+- "LobbyPage rendering..."
+- Socket connection status messages
 
 ### Environment variables
 

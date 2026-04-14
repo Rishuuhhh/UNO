@@ -8,9 +8,20 @@ const SPRING = { type: 'spring', stiffness: 360, damping: 26, mass: 0.9 };
 const EASE   = [0.25, 0.46, 0.45, 0.94];
 
 function LobbyPage() {
+  console.log('LobbyPage rendering...');
+  
   const navigate = useNavigate();
-  const { socket } = useSocket(navigate);
+  const { socket, connected, reconnecting } = useSocket(navigate);
   const { roomCode, players, error } = useGameStore();
+
+  console.log('LobbyPage state:', { 
+    socket: !!socket, 
+    socketConnected: connected,
+    reconnecting,
+    roomCode, 
+    playersCount: players.length, 
+    error 
+  });
 
   const [createName, setCreateName] = useState('');
   const [joinName,   setJoinName]   = useState('');
@@ -19,6 +30,140 @@ function LobbyPage() {
   const myId    = socket?.id;
   const isHost  = players.length > 0 && players[0]?.id === myId;
   const canStart = players.length >= 2;
+
+function LobbyPage() {
+  console.log('LobbyPage rendering...');
+  
+  const navigate = useNavigate();
+  const { socket, connected, reconnecting, connectionError } = useSocket(navigate);
+  const { roomCode, players, error } = useGameStore();
+
+  console.log('LobbyPage state:', { 
+    socket: !!socket, 
+    socketConnected: connected,
+    reconnecting,
+    connectionError,
+    roomCode, 
+    playersCount: players.length, 
+    error 
+  });
+
+  const [createName, setCreateName] = useState('');
+  const [joinName,   setJoinName]   = useState('');
+  const [joinCode,   setJoinCode]   = useState('');
+
+  const myId    = socket?.id;
+  const isHost  = players.length > 0 && players[0]?.id === myId;
+  const canStart = players.length >= 2;
+
+  // Show connection error screen
+  if (connectionError && !connected) {
+    return (
+      <div style={{
+        minHeight: '100vh', 
+        background: '#080810',
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        padding: 16,
+        color: '#fff',
+        fontFamily: 'Poppins, sans-serif'
+      }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          style={{ textAlign: 'center', maxWidth: 500 }}
+        >
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 20, color: '#ef4444' }}>
+            Connection Failed
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 20 }}>
+            Unable to connect to the game server
+          </p>
+          <div style={{
+            background: 'rgba(239,68,68,0.15)',
+            border: '1px solid rgba(239,68,68,0.4)',
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 20,
+            color: 'rgba(252,165,165,0.9)',
+            fontSize: 14
+          }}>
+            {connectionError}
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 20 }}>
+            Make sure the backend server is running on: {import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            style={{
+              background: '#3b82f6',
+              color: '#fff',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14
+            }}
+          >
+            Retry Connection
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Show loading screen while socket is connecting
+  if (!connected && !reconnecting) {
+    return (
+      <div style={{
+        minHeight: '100vh', 
+        background: '#080810',
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        padding: 16,
+        color: '#fff',
+        fontFamily: 'Poppins, sans-serif'
+      }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          style={{ textAlign: 'center' }}
+        >
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 20 }}>
+            <span style={{ color: '#ef4444' }}>U</span>
+            <span style={{ color: '#3b82f6' }}>N</span>
+            <span style={{ color: '#eab308' }}>O</span>
+          </h1>
+          <div style={{ 
+            width: 40, 
+            height: 40, 
+            border: '3px solid rgba(255,255,255,0.1)',
+            borderTop: '3px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <p style={{ color: 'rgba(255,255,255,0.7)' }}>Connecting to server...</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 10 }}>
+            Server: {import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}
+          </p>
+        </motion.div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   const handleCreate = (e) => {
     e.preventDefault();

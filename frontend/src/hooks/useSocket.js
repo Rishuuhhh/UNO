@@ -11,11 +11,25 @@ let _socket = null;
 
 function getSocket() {
   if (!_socket) {
+    console.log('Creating new socket connection to:', SERVER_URL);
     _socket = io(SERVER_URL, {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
+      timeout: 10000, // 10 second connection timeout
+    });
+    
+    _socket.on('connect', () => {
+      console.log('Socket connected successfully');
+    });
+    
+    _socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+    
+    _socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
     });
   }
   return _socket;
@@ -48,6 +62,16 @@ export function useSocket(navigate) {
   const [connected, setConnected] = useState(socket.connected);
   const [reconnecting, setReconnecting] = useState(false);
   const [reconnectCountdown, setReconnectCountdown] = useState(RECONNECT_TIMEOUT_S);
+  const [initializing, setInitializing] = useState(!socket.connected);
+  const [connectionError, setConnectionError] = useState(null);
+
+  console.log('useSocket hook state:', { 
+    connected, 
+    reconnecting, 
+    initializing,
+    connectionError,
+    socketId: socket.id 
+  });
   const countdownRef = useRef(null);
   const navigateRef = useRef(navigate);
 
@@ -92,7 +116,10 @@ export function useSocket(navigate) {
   useEffect(() => {
     // ── Connection lifecycle ──────────────────────────────────────────────
     const onConnect = () => {
+      console.log('Socket connected in useSocket hook');
       setConnected(true);
+      setInitializing(false);
+      setConnectionError(null);
       stopCountdown();
 
       // Attempt to rejoin if we have a saved session
@@ -105,6 +132,12 @@ export function useSocket(navigate) {
     const onDisconnect = () => {
       setConnected(false);
       startCountdown();
+    };
+
+    const onConnectError = (error) => {
+      console.error('Connection error:', error);
+      setConnectionError(error.message || 'Failed to connect to server');
+      setInitializing(false);
     };
 
     const onReconnect = () => {
@@ -187,6 +220,7 @@ export function useSocket(navigate) {
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
     socket.on('reconnect', onReconnect);
     socket.on('room_created', onRoomCreated);
     socket.on('join_room_success', onJoinRoomSuccess);
@@ -204,6 +238,7 @@ export function useSocket(navigate) {
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
       socket.off('reconnect', onReconnect);
       socket.off('room_created', onRoomCreated);
       socket.off('join_room_success', onJoinRoomSuccess);
@@ -221,7 +256,7 @@ export function useSocket(navigate) {
     };
   }, [resolveMyTurn, startCountdown, stopCountdown]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { socket, connected, reconnecting, reconnectCountdown };
+  return { socket, connected, reconnecting, reconnectCountdown, initializing, connectionError };
 }
 
 export default useSocket;
