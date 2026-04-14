@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from '../store/gameStore';
 import { useSocket } from '../hooks/useSocket';
+
+const SPRING = { type: 'spring', stiffness: 360, damping: 26, mass: 0.9 };
+const EASE   = [0.25, 0.46, 0.45, 0.94];
 
 function LobbyPage() {
   const navigate = useNavigate();
@@ -9,180 +13,283 @@ function LobbyPage() {
   const { roomCode, players, error } = useGameStore();
 
   const [createName, setCreateName] = useState('');
-  const [joinName, setJoinName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
+  const [joinName,   setJoinName]   = useState('');
+  const [joinCode,   setJoinCode]   = useState('');
 
-  // Determine if the current socket is the host (first player in list)
-  const myId = socket?.id;
-  const isHost = players.length > 0 && players[0]?.id === myId;
+  const myId    = socket?.id;
+  const isHost  = players.length > 0 && players[0]?.id === myId;
   const canStart = players.length >= 2;
 
   const handleCreate = (e) => {
     e.preventDefault();
-    if (createName.trim() && socket) {
-      socket.emit('create_room', { displayName: createName.trim() });
-    }
+    if (createName.trim() && socket) socket.emit('create_room', { displayName: createName.trim() });
   };
 
   const handleJoin = (e) => {
     e.preventDefault();
-    if (joinName.trim() && joinCode.trim() && socket) {
-      socket.emit('join_room', {
-        roomCode: joinCode.trim().toUpperCase(),
-        displayName: joinName.trim(),
-      });
-    }
+    if (joinName.trim() && joinCode.trim() && socket)
+      socket.emit('join_room', { roomCode: joinCode.trim().toUpperCase(), displayName: joinName.trim() });
   };
 
   const handleStart = () => {
-    if (socket && isHost && canStart) {
-      socket.emit('start_game', { roomCode });
-    }
+    if (socket && isHost && canStart) socket.emit('start_game', { roomCode });
+  };
+
+  // ── Shared input style ──────────────────────────────────────────────────────
+  const inputStyle = {
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 12, padding: '10px 16px',
+    color: '#fff', fontSize: 14, outline: 'none', width: '100%',
+    transition: 'border-color 0.18s ease',
+    fontFamily: 'Poppins, sans-serif',
   };
 
   // ── Waiting room ────────────────────────────────────────────────────────────
   if (roomCode) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
-        <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md shadow-xl">
-          <h1 className="text-3xl font-bold text-center mb-2">Lobby</h1>
+      <div style={{
+        minHeight: '100vh', background: '#080810',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+      }}>
+        <motion.div
+          initial={{ opacity: 0, y: 40, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0,  scale: 1    }}
+          transition={SPRING}
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 24, padding: '36px 32px',
+            width: '100%', maxWidth: 440,
+            boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+            color: '#fff',
+          }}
+        >
+          <h1 style={{ fontSize: 28, fontWeight: 800, textAlign: 'center', marginBottom: 4 }}>Lobby</h1>
 
-          <div className="text-center mb-6">
-            <p className="text-gray-400 text-sm mb-1">Room Code</p>
-            <p className="text-4xl font-mono font-bold tracking-widest text-yellow-400" data-testid="room-code">
+          {/* Room code */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>Room Code</p>
+            <motion.p
+              data-testid="room-code"
+              animate={{ textShadow: ['0 0 10px rgba(234,179,8,0.4)', '0 0 22px rgba(234,179,8,0.8)', '0 0 10px rgba(234,179,8,0.4)'] }}
+              transition={{ repeat: Infinity, duration: 2.5 }}
+              style={{ fontSize: 40, fontWeight: 900, letterSpacing: 10, color: '#eab308', fontFamily: 'monospace' }}
+            >
               {roomCode}
-            </p>
+            </motion.p>
           </div>
 
-          {error && (
-            <div className="bg-red-900/50 border border-red-500 text-red-300 rounded-lg p-3 mb-4 text-sm" role="alert">
-              {error}
-            </div>
-          )}
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0,  scale: 1    }}
+                exit={{    opacity: 0, y: -8, scale: 0.96 }}
+                transition={{ duration: 0.2, ease: EASE }}
+                style={{
+                  background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
+                  borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+                  color: 'rgba(252,165,165,0.9)', fontSize: 13,
+                }}
+                role="alert"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-3 text-gray-300">
+          {/* Player list */}
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
               Players ({players.length}/10)
-            </h2>
-            <ul className="space-y-2" data-testid="player-list">
-              {players.map((player, index) => (
-                <li
-                  key={player.id}
-                  className="flex items-center gap-2 bg-gray-700 rounded-lg px-4 py-2"
-                  data-testid={`player-item-${player.id}`}
-                >
-                  {index === 0 && (
-                    <span
-                      className="text-yellow-400 text-lg"
-                      title="Host"
-                      data-testid="host-indicator"
-                      aria-label="Host"
-                    >
-                      ★
-                    </span>
-                  )}
-                  <span className="font-medium">{player.displayName}</span>
-                  {player.id === myId && (
-                    <span className="ml-auto text-xs text-gray-400">(you)</span>
-                  )}
-                </li>
-              ))}
+            </p>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }} data-testid="player-list">
+              <AnimatePresence>
+                {players.map((player, index) => (
+                  <motion.li
+                    key={player.id}
+                    data-testid={`player-item-${player.id}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0   }}
+                    exit={{    opacity: 0, x:  20  }}
+                    transition={{ ...SPRING, delay: index * 0.05 }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.07)',
+                      borderRadius: 12, padding: '10px 14px',
+                    }}
+                  >
+                    {index === 0 && (
+                      <span data-testid="host-indicator" aria-label="Host" style={{ color: '#eab308', fontSize: 16 }}>★</span>
+                    )}
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{player.displayName}</span>
+                    {player.id === myId && (
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>(you)</span>
+                    )}
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           </div>
 
-          {isHost && (
-            <button
+          {/* Start / waiting */}
+          {isHost ? (
+            <motion.button
               onClick={handleStart}
               disabled={!canStart}
               data-testid="start-game-button"
-              className="w-full py-3 rounded-xl font-bold text-lg transition-colors
-                disabled:opacity-40 disabled:cursor-not-allowed
-                bg-green-600 hover:bg-green-500 disabled:bg-green-800"
+              whileHover={canStart ? { scale: 1.03, y: -2, transition: { type: 'spring', stiffness: 500, damping: 20 } } : {}}
+              whileTap={canStart ? { scale: 0.95, transition: { duration: 0.1 } } : {}}
+              style={{
+                width: '100%', padding: '14px 0', borderRadius: 14,
+                background: canStart ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(34,197,94,0.2)',
+                color: canStart ? '#fff' : 'rgba(255,255,255,0.35)',
+                fontWeight: 800, fontSize: 16, border: 'none', cursor: canStart ? 'pointer' : 'not-allowed',
+                boxShadow: canStart ? '0 4px 20px rgba(34,197,94,0.4)' : 'none',
+                transition: 'all 0.25s ease',
+              }}
             >
               {canStart ? 'Start Game' : 'Waiting for players…'}
-            </button>
-          )}
-
-          {!isHost && (
-            <p className="text-center text-gray-400 text-sm mt-2">
-              Waiting for the host to start the game…
+            </motion.button>
+          ) : (
+            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
+              Waiting for the host to start…
             </p>
           )}
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  // ── Join / Create forms ─────────────────────────────────────────────────────
+  // ── Create / Join ───────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 gap-6">
-      <h1 className="text-4xl font-bold">UNO Multiplayer</h1>
+    <div style={{
+      minHeight: '100vh', background: '#080810',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: 16, gap: 20, color: '#fff',
+    }}>
+      {/* Title */}
+      <motion.h1
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={SPRING}
+        style={{ fontSize: 38, fontWeight: 900, letterSpacing: -1, marginBottom: 4 }}
+      >
+        <span style={{ color: '#ef4444' }}>U</span>
+        <span style={{ color: '#3b82f6' }}>N</span>
+        <span style={{ color: '#eab308' }}>O</span>
+        <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 400, fontSize: 24, marginLeft: 12 }}>Multiplayer</span>
+      </motion.h1>
 
-      {error && (
-        <div className="bg-red-900/50 border border-red-500 text-red-300 rounded-lg p-3 w-full max-w-md text-sm" role="alert">
-          {error}
-        </div>
-      )}
+      {/* Error */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: EASE }}
+            style={{
+              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
+              borderRadius: 10, padding: '10px 16px', width: '100%', maxWidth: 440,
+              color: 'rgba(252,165,165,0.9)', fontSize: 13,
+            }}
+            role="alert"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Create Room */}
-      <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold mb-4">Create a Room</h2>
-        <form onSubmit={handleCreate} className="flex flex-col gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0,  scale: 1    }}
+        transition={{ ...SPRING, delay: 0.08 }}
+        style={{
+          background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20,
+          padding: '24px 28px', width: '100%', maxWidth: 440,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+        }}
+      >
+        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'rgba(255,255,255,0.85)' }}>Create a Room</h2>
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input
-            type="text"
-            placeholder="Your display name"
-            value={createName}
-            onChange={(e) => setCreateName(e.target.value)}
-            maxLength={20}
-            required
-            aria-label="Display name for creating a room"
-            className="bg-gray-700 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
+            type="text" placeholder="Your display name"
+            value={createName} onChange={(e) => setCreateName(e.target.value)}
+            maxLength={20} required aria-label="Display name for creating a room"
+            style={inputStyle}
+            onFocus={(e) => e.target.style.borderColor = 'rgba(234,179,8,0.5)'}
+            onBlur={(e)  => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
           />
-          <button
-            type="submit"
-            disabled={!createName.trim()}
-            className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed
-              text-gray-900 font-bold py-2 rounded-lg transition-colors"
+          <motion.button
+            type="submit" disabled={!createName.trim()}
+            whileHover={createName.trim() ? { scale: 1.03, y: -2, transition: { type: 'spring', stiffness: 500, damping: 20 } } : {}}
+            whileTap={createName.trim() ? { scale: 0.95, transition: { duration: 0.1 } } : {}}
+            style={{
+              background: createName.trim() ? 'linear-gradient(135deg,#eab308,#ca8a04)' : 'rgba(234,179,8,0.2)',
+              color: createName.trim() ? '#1a0f00' : 'rgba(255,255,255,0.3)',
+              fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 12,
+              border: 'none', cursor: createName.trim() ? 'pointer' : 'not-allowed',
+              boxShadow: createName.trim() ? '0 4px 16px rgba(234,179,8,0.35)' : 'none',
+              transition: 'all 0.22s ease',
+            }}
           >
             Create Room
-          </button>
+          </motion.button>
         </form>
-      </div>
+      </motion.div>
 
       {/* Join Room */}
-      <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold mb-4">Join a Room</h2>
-        <form onSubmit={handleJoin} className="flex flex-col gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0,  scale: 1    }}
+        transition={{ ...SPRING, delay: 0.14 }}
+        style={{
+          background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20,
+          padding: '24px 28px', width: '100%', maxWidth: 440,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+        }}
+      >
+        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'rgba(255,255,255,0.85)' }}>Join a Room</h2>
+        <form onSubmit={handleJoin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input
-            type="text"
-            placeholder="Room code"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-            maxLength={6}
-            required
-            aria-label="Room code"
-            className="bg-gray-700 rounded-lg px-4 py-2 font-mono uppercase outline-none focus:ring-2 focus:ring-blue-400"
+            type="text" placeholder="Room code"
+            value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
+            maxLength={6} required aria-label="Room code"
+            style={{ ...inputStyle, textTransform: 'uppercase', fontFamily: 'monospace', letterSpacing: 4 }}
+            onFocus={(e) => e.target.style.borderColor = 'rgba(59,130,246,0.5)'}
+            onBlur={(e)  => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
           />
           <input
-            type="text"
-            placeholder="Your display name"
-            value={joinName}
-            onChange={(e) => setJoinName(e.target.value)}
-            maxLength={20}
-            required
-            aria-label="Display name for joining a room"
-            className="bg-gray-700 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-400"
+            type="text" placeholder="Your display name"
+            value={joinName} onChange={(e) => setJoinName(e.target.value)}
+            maxLength={20} required aria-label="Display name for joining a room"
+            style={inputStyle}
+            onFocus={(e) => e.target.style.borderColor = 'rgba(59,130,246,0.5)'}
+            onBlur={(e)  => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
           />
-          <button
-            type="submit"
-            disabled={!joinName.trim() || !joinCode.trim()}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed
-              text-white font-bold py-2 rounded-lg transition-colors"
+          <motion.button
+            type="submit" disabled={!joinName.trim() || !joinCode.trim()}
+            whileHover={joinName.trim() && joinCode.trim() ? { scale: 1.03, y: -2, transition: { type: 'spring', stiffness: 500, damping: 20 } } : {}}
+            whileTap={joinName.trim() && joinCode.trim() ? { scale: 0.95, transition: { duration: 0.1 } } : {}}
+            style={{
+              background: joinName.trim() && joinCode.trim() ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'rgba(59,130,246,0.2)',
+              color: joinName.trim() && joinCode.trim() ? '#fff' : 'rgba(255,255,255,0.3)',
+              fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 12,
+              border: 'none', cursor: joinName.trim() && joinCode.trim() ? 'pointer' : 'not-allowed',
+              boxShadow: joinName.trim() && joinCode.trim() ? '0 4px 16px rgba(59,130,246,0.35)' : 'none',
+              transition: 'all 0.22s ease',
+            }}
           >
             Join Room
-          </button>
+          </motion.button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -300,5 +300,15 @@ export function sanitizeStateForPlayer(gameState, playerId) {
   const myHand = gameState.players.find(p => p.id === playerId)?.hand ?? [];
   const { players: _players, ...stateWithoutPlayers } = gameState;
 
-  return { ...stateWithoutPlayers, players, myHand };
+  return {
+    ...stateWithoutPlayers,
+    players,
+    myHand,
+    turnStartedAt: gameState.turnStartedAt ?? null,
+    turnTimeLimit: gameState.turnTimeLimit ?? 30,
+    gameStartedAt: gameState.gameStartedAt ?? null,
+    gameTimeLimit: gameState.gameTimeLimit ?? 600,
+    round: gameState.round ?? 1,
+    totalRounds: gameState.totalRounds ?? 3,
+  };
 }

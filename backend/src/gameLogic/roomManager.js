@@ -14,6 +14,7 @@ import {
   checkWin,
   calculateScore,
   drawCard as engineDrawCard,
+  sanitizeStateForPlayer,
 } from './engine.js';
 
 // ─── In-memory state ──────────────────────────────────────────────────────────
@@ -206,6 +207,195 @@ export async function leaveRoom(socketId) {
   return { room, deleted: false };
 }
 
+// ─── Turn timer ───────────────────────────────────────────────────────────────
+
+/**
+ * Cancels any existing turn timer on the room.
+ * @param {object} room
+ */
+export function cancelTurnTimer(room) {
+  if (room._turnTimer) {
+    clearTimeout(room._turnTimer);
+    room._turnTimer = null;
+  }
+}
+
+/**
+ * Starts a 30s turn timer. On expiry, auto-draws for the current player.
+ * @param {string} roomCode
+ * @param {import('socket.io').Server} io
+ */
+export function startTurnTimer(roomCode, io) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+
+  cancelTurnTimer(room);
+
+  room._turnTimer = setTimeout(async () => {
+    const currentRoom = rooms.get(roomCode);
+    if (!currentRoom || !currentRoom.gameState) return;
+    const currentPlayer = currentRoom.gameState.players[currentRoom.gameState.currentTurnIndex];
+    if (!currentPlayer) return;
+
+    try {
+      const { room: updatedRoom } = await drawCard(currentPlayer.id);
+      const gs = updatedRoom.gameState;
+      for (const player of gs.players) {
+        const clientState = sanitizeStateForPlayer(gs, player.id);
+        io.to(player.id).emit('game_state_update', { delta: clientState });
+      }
+      startTurnTimer(roomCode, io);
+    } catch (_) {
+      // ignore errors during auto-draw
+    }
+  }, 30000);
+}
+
+// ─── Game timer / rounds ──────────────────────────────────────────────────────
+
+/**
+ * Starts a 10-minute game timer. On expiry, ends the round by timeout.
+ * @param {string} roomCode
+ * @param {import('socket.io').Server} io
+ */
+export function startGameTimer(roomCode, io) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+
+  if (room._gameTimer) {
+    clearTimeout(room._gameTimer);
+    room._gameTimer = null;
+  }
+
+  room._gameTimer = setTimeout(() => {
+    endRoundByTimeout(roomCode, io);
+  }, 600000);
+}
+
+/**
+ * Ends the round by finding the player with fewest cards (tie-break: lowest point value).
+ * @param {string} roomCode
+ * @param {import('socket.io').Server} io
+ */
+async function endRoundByTimeout(roomCode, io) {
+  const room = rooms.get(roomCode);
+  if (!room || !room.gameState) return;
+
+  const players = room.gameState.players;
+  let winner = players[0];
+  for (const p of players) {
+    if (p.hand.length < winner.hand.length) {
+      winner = p;
+    } else if (p.hand.length === winner.hand.length) {
+      const pointValue = (hand) => hand.reduce((sum, c) => {
+        if (['skip', 'reverse', 'draw2'].includes(c.value)) return sum + 20;
+        if (['wild', 'wild4'].includes(c.value)) return sum + 50;
+        return sum + (parseInt(c.value, 10) || 0);
+      }, 0);
+      if (pointValue(p.hand) < pointValue(winner.hand)) winner = p;
+    }
+  }
+
+  await finishRound(roomCode, winner.id, io);
+}
+
+/**
+ * Finishes a round: accumulates scores, starts next round or ends game.
+ * @param {string} roomCode
+ * @param {string} winnerId
+ * @param {import('socket.io').Server} io
+ */
+async function finishRound(roomCode, winnerId, io) {
+  const room = rooms.get(roomCode);
+  if (!room || !room.gameState) return;
+
+  // Cancel timers
+  cancelTurnTimer(room);
+  if (room._gameTimer) {
+    clearTimeout(room._gameTimer);
+    room._gameTimer = null;
+  }
+
+  const scoresMap = calculateScore(room.gameState.players);
+  if (!room.roundScores) room.roundScores = {};
+  for (const [id, score] of scoresMap) {
+    room.roundScores[id] = (room.roundScores[id] ?? 0) + score;
+  }
+
+  if (room.round < room.totalRounds) {
+    // Start next round
+    room.round += 1;
+
+    const deck = shuffleDeck(buildDeck());
+    let gameState = {
+      roomCode: room.roomCode,
+      status: 'playing',
+      players: room.players.map(p => ({ ...p, hand: [] })),
+      currentTurnIndex: 0,
+      direction: 1,
+      currentColor: 'red',
+      currentValue: '0',
+      drawPile: deck,
+      discardPile: [],
+      pendingDrawCount: 0,
+      drawnCardPending: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      turnStartedAt: Date.now(),
+      turnTimeLimit: 30,
+      gameStartedAt: Date.now(),
+      gameTimeLimit: 600,
+      round: room.round,
+      totalRounds: room.totalRounds,
+    };
+
+    gameState = dealCards(gameState, 7);
+
+    let initialCard;
+    do {
+      initialCard = gameState.drawPile.shift();
+    } while (initialCard && initialCard.value === 'wild4');
+
+    if (!initialCard) return;
+
+    gameState.discardPile = [initialCard];
+    gameState.currentColor = initialCard.color === 'wild' ? 'red' : initialCard.color;
+    gameState.currentValue = initialCard.value;
+
+    room.gameState = gameState;
+    room.players = gameState.players;
+
+    await persistRoom(room);
+
+    for (const player of gameState.players) {
+      const clientState = sanitizeStateForPlayer(gameState, player.id);
+      io.to(player.id).emit('round_started', {
+        myHand: clientState.myHand,
+        gameState: clientState,
+        round: room.round,
+      });
+    }
+
+    startTurnTimer(roomCode, io);
+    startGameTimer(roomCode, io);
+  } else {
+    // Game over — all rounds complete
+    const winnerPlayer = room.gameState.players.find(p => p.id === winnerId);
+    room.gameState.status = 'finished';
+    room.status = 'lobby';
+
+    await persistRoom(room);
+
+    io.to(roomCode).emit('game_over', {
+      winnerId,
+      winnerName: winnerPlayer?.displayName ?? winnerId,
+      scores: room.roundScores,
+      roundScores: room.roundScores,
+      finalCounts: Object.fromEntries(room.gameState.players.map(p => [p.id, p.hand.length])),
+    });
+  }
+}
+
 // ─── Task 8.4: startGame ──────────────────────────────────────────────────────
 
 /**
@@ -225,6 +415,11 @@ export async function startGame(socketId) {
     throw { type: 'room_error', message: 'At least 2 players are required to start' };
   }
 
+  // Initialize round tracking
+  room.round = 1;
+  room.totalRounds = 3;
+  room.roundScores = {};
+
   const deck = shuffleDeck(buildDeck());
 
   // Build initial game state with shuffled deck as draw pile
@@ -242,6 +437,12 @@ export async function startGame(socketId) {
     drawnCardPending: false,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    turnStartedAt: Date.now(),
+    turnTimeLimit: 30,
+    gameStartedAt: Date.now(),
+    gameTimeLimit: 600,
+    round: 1,
+    totalRounds: 3,
   };
 
   // Deal 7 cards to each player
@@ -281,10 +482,15 @@ export async function startGame(socketId) {
  * @param {string} socketId
  * @param {string} cardId
  * @param {string|undefined} chosenColor
+ * @param {import('socket.io').Server|null} [io]
  * @returns {{ room: object, winner: object|null, scores: object|null }}
  */
-export async function playCard(socketId, cardId, chosenColor) {
+export async function playCard(socketId, cardId, chosenColor, io = null) {
   const room = getPlayerRoom(socketId);
+
+  // Cancel turn timer before processing
+  cancelTurnTimer(room);
+
   const gameState = room.gameState;
 
   const currentPlayer = gameState.players[gameState.currentTurnIndex];
@@ -329,10 +535,22 @@ export async function playCard(socketId, cardId, chosenColor) {
   // Apply card effect (advances turn, applies draw penalties, etc.)
   newGameState = applyCardEffect(card, newGameState, chosenColor);
 
+  // Update turnStartedAt for the new turn
+  newGameState = { ...newGameState, turnStartedAt: Date.now() };
+
   // Check for win
   const winnerId = checkWin(newGameState);
 
   if (winnerId) {
+    room.gameState = newGameState;
+    room.players = newGameState.players;
+
+    if (io) {
+      await finishRound(room.roomCode, winnerId, io);
+      return { room, winner: null, scores: null, _roundHandled: true };
+    }
+
+    // Fallback (no io): legacy behavior
     const winnerPlayer = newGameState.players.find(p => p.id === winnerId);
     const scoresMap = calculateScore(newGameState.players);
     const scores = {};
@@ -373,6 +591,10 @@ export async function playCard(socketId, cardId, chosenColor) {
  */
 export async function drawCard(socketId) {
   const room = getPlayerRoom(socketId);
+
+  // Cancel turn timer before processing
+  cancelTurnTimer(room);
+
   const gameState = room.gameState;
 
   const currentPlayer = gameState.players[gameState.currentTurnIndex];
@@ -402,7 +624,7 @@ export async function drawCard(socketId) {
   // Advance turn after drawing — in standard UNO you draw one card then pass
   const stateWithNextTurn = nextTurn(stateWithReset);
 
-  room.gameState = { ...stateWithNextTurn, updatedAt: Date.now() };
+  room.gameState = { ...stateWithNextTurn, updatedAt: Date.now(), turnStartedAt: Date.now() };
   room.players = stateWithNextTurn.players;
 
   await persistRoom(room);

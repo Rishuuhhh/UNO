@@ -167,6 +167,13 @@ export function useSocket(navigate) {
       clearSession();
     };
 
+    const onRoundStarted = ({ myHand, gameState, round }) => {
+      const store = useGameStore.getState();
+      store.setGameState(gameState);
+      store.setMyHand(myHand ?? []);
+      store.setMyTurn(resolveMyTurn(gameState, socket.id));
+    };
+
     // ── Errors ────────────────────────────────────────────────────────────
     const onActionError = ({ message }) => useGameStore.getState().setError(message);
     const onRoomError = ({ message }) => {
@@ -187,6 +194,7 @@ export function useSocket(navigate) {
     socket.on('game_started', onGameStarted);
     socket.on('game_state_update', onGameStateUpdate);
     socket.on('game_over', onGameOver);
+    socket.on('round_started', onRoundStarted);
     socket.on('action_error', onActionError);
     socket.on('room_error', onRoomError);
     socket.on('chat_error', onChatError);
@@ -203,6 +211,7 @@ export function useSocket(navigate) {
       socket.off('game_started', onGameStarted);
       socket.off('game_state_update', onGameStateUpdate);
       socket.off('game_over', onGameOver);
+      socket.off('round_started', onRoundStarted);
       socket.off('action_error', onActionError);
       socket.off('room_error', onRoomError);
       socket.off('chat_error', onChatError);

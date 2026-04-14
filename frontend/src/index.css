@@ -1,3 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+* {
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background: #0a0a0f;
+  overflow: hidden;
+}
+
+/* Animated background gradient */
+.bg-game {
+  background: radial-gradient(ellipse at 20% 50%, rgba(120, 40, 200, 0.15) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(220, 40, 40, 0.12) 0%, transparent 50%),
+              radial-gradient(ellipse at 60% 80%, rgba(40, 100, 220, 0.12) 0%, transparent 50%),
+              #0a0a0f;
+}
+
+/* Glassmorphism card */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Glow effects */
+.glow-red    { box-shadow: 0 0 20px rgba(239, 68, 68, 0.6),  0 0 40px rgba(239, 68, 68, 0.2); }
+.glow-blue   { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.2); }
+.glow-green  { box-shadow: 0 0 20px rgba(34, 197, 94, 0.6),  0 0 40px rgba(34, 197, 94, 0.2); }
+.glow-yellow { box-shadow: 0 0 20px rgba(234, 179, 8, 0.6),  0 0 40px rgba(234, 179, 8, 0.2); }
+.glow-white  { box-shadow: 0 0 20px rgba(255,255,255, 0.3),  0 0 40px rgba(255,255,255, 0.1); }
+.glow-purple { box-shadow: 0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(168, 85, 247, 0.2); }
+
+/* Turn pulse ring */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7); }
+  70%  { box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+}
+.pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
+
+/* UNO button pulse */
+@keyframes uno-pulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 20px rgba(239,68,68,0.5); }
+  50%       { transform: scale(1.06); box-shadow: 0 0 35px rgba(239,68,68,0.9); }
+}
+.uno-pulse { animation: uno-pulse 0.9s ease-in-out infinite; }
+
+/* Floating particles */
+@keyframes float-up {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 0.6; }
+  100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
+}
+
+/* Table felt ring */
+.table-felt {
+  background: radial-gradient(ellipse 70% 45% at 50% 50%,
+    rgba(10, 40, 15, 0.35) 0%,
+    rgba(5, 20, 8, 0.15) 60%,
+    transparent 100%);
+  pointer-events: none;
+}
+
+/* Playable card ring */
+@keyframes playable-ring {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.03); }
+}
+
+/* Card 3D perspective */
+.card-scene { perspective: 600px; }
+
+/* Avatar ring spin — SVG uses framer-motion but needs this for transform-box */
+svg circle { transform-box: fill-box; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }

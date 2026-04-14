@@ -15,6 +15,8 @@ import {
   unoCall,
   challengeUno,
   handleDisconnect,
+  startTurnTimer,
+  startGameTimer,
 } from '../gameLogic/roomManager.js';
 import { sanitizeStateForPlayer } from '../gameLogic/engine.js';
 
@@ -236,6 +238,9 @@ export function registerSocketHandlers(io, socket) {
           gameState: clientState,
         });
       }
+
+      startTurnTimer(room.roomCode, io);
+      startGameTimer(room.roomCode, io);
     } catch (err) {
       handleRoomManagerError(socket, err);
     }
@@ -257,8 +262,13 @@ export function registerSocketHandlers(io, socket) {
     }
 
     try {
-      const { room, winner, scores } = await playCard(socket.id, payload.cardId, payload.chosenColor);
+      const { room, winner, scores, _roundHandled } = await playCard(socket.id, payload.cardId, payload.chosenColor, io);
       const gameState = room.gameState;
+
+      if (_roundHandled) {
+        // finishRound already handled broadcasting
+        return;
+      }
 
       if (winner) {
         // Calculate final hand counts
@@ -279,6 +289,7 @@ export function registerSocketHandlers(io, socket) {
           const clientState = sanitizeStateForPlayer(gameState, player.id);
           io.to(player.id).emit('game_state_update', { delta: clientState });
         }
+        startTurnTimer(room.roomCode, io);
       }
     } catch (err) {
       handleRoomManagerError(socket, err);
@@ -308,6 +319,7 @@ export function registerSocketHandlers(io, socket) {
         const clientState = sanitizeStateForPlayer(gameState, player.id);
         io.to(player.id).emit('game_state_update', { delta: clientState });
       }
+      startTurnTimer(room.roomCode, io);
     } catch (err) {
       handleRoomManagerError(socket, err);
     }
