@@ -95,7 +95,6 @@ function WildOval({ small, mobile }) {
             #22c55e 180deg 270deg, 
             #eab308 270deg 360deg
           )`,
-          animation: 'spin 4s linear infinite',
         }}
       />
       
@@ -177,46 +176,35 @@ export default function Card({
   playable = false, 
   onClick, 
   className = '',
-  mobile = false 
+  mobile = false,
+  animate: shouldAnimate = false,
 }) {
   if (!card) return <CardBack small={small} mobile={mobile} />;
 
   const size = getCardSize(small, mobile);
   const borderRadius = small ? 6 : 8;
   const isWild = card.value === 'wild' || card.value === 'wild4';
-  const color = isWild ? 'wild' : card.color;
-  const config = COLOR_CONFIG[color];
-  const valueDisplay = VALUE_DISPLAY[card.value] || { symbol: card.value, label: card.value };
+  const color = isWild ? 'wild' : (card.color || 'wild');
+  const config = COLOR_CONFIG[color] || COLOR_CONFIG.wild;
+  const valueDisplay = VALUE_DISPLAY[card.value] || { symbol: String(card.value), label: String(card.value) };
   
-  // Responsive font sizes
   const mainFontSize = small ? (mobile ? 12 : 16) : (mobile ? 18 : 24);
   const cornerFontSize = small ? (mobile ? 8 : 10) : (mobile ? 10 : 12);
 
   return (
     <motion.div
-      className={`relative overflow-hidden flex-shrink-0 cursor-pointer select-none ${className}`}
-      style={{
-        width: size.w,
-        height: size.h,
-        borderRadius,
-      }}
+      className={`relative overflow-hidden flex-shrink-0 select-none ${playable ? 'cursor-pointer' : 'cursor-default'} ${className}`}
+      style={{ width: size.w, height: size.h, borderRadius }}
       onClick={playable && onClick ? () => onClick(card) : undefined}
-      whileHover={playable ? { 
-        scale: 1.05, 
-        y: -4,
-        transition: SPRING_BOUNCY 
-      } : {}}
-      whileTap={playable ? { 
-        scale: 0.95,
-        transition: { duration: 0.1 }
-      } : {}}
-      initial={{ opacity: 0, scale: 0.8, rotateY: -90 }}
-      animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-      exit={{ opacity: 0, scale: 0.8, rotateY: 90 }}
+      whileHover={playable ? { scale: 1.05, y: -4, transition: SPRING_BOUNCY } : {}}
+      whileTap={playable ? { scale: 0.95, transition: { duration: 0.1 } } : {}}
+      initial={shouldAnimate ? { opacity: 0, scale: 0.8 } : false}
+      animate={shouldAnimate ? { opacity: 1, scale: 1 } : {}}
+      exit={shouldAnimate ? { opacity: 0, scale: 0.8 } : {}}
       transition={SPRING_SMOOTH}
-      role="button"
+      role={playable ? 'button' : undefined}
       tabIndex={playable ? 0 : -1}
-      aria-label={`${valueDisplay.label} ${isWild ? 'Wild' : color} card${playable ? ', playable' : ''}`}
+      aria-label={`${valueDisplay.label} ${isWild ? '' : color} card${playable ? ', playable' : ''}`}
       data-card-id={card.id}
     >
       {/* Main gradient background */}
@@ -304,33 +292,10 @@ export default function Card({
         }}
       />
 
-      {/* Playable indicator */}
+      {/* Playable indicator — static ring, no animation */}
       {playable && (
-        <>
-          {/* Pulsing ring */}
-          <div 
-            className="absolute -inset-1 rounded-lg pointer-events-none playable-card"
-            style={{
-              border: '2px solid rgba(99, 102, 241, 0.8)',
-              borderRadius: borderRadius + 2,
-            }}
-          />
-          
-          {/* Glow effect */}
-          <div 
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              borderRadius,
-              boxShadow: config.glow,
-            }}
-          />
-        </>
-      )}
-
-      {/* Shimmer effect for special cards */}
-      {isWild && (
-        <div 
-          className="absolute inset-0 pointer-events-none card-shimmer"
+        <div
+          className="absolute inset-0 pointer-events-none playable-card"
           style={{ borderRadius }}
         />
       )}

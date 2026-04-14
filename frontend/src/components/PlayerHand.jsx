@@ -118,15 +118,13 @@ export default function PlayerHand({ cards = [], playableCardIds = new Set(), on
                 }}
                 className="touch-manipulation"
               >
-                <Card
+              <Card
                   card={card}
                   playable={isPlayable}
                   onClick={onPlayCard}
                   mobile={isMobile}
-                  className={`
-                    transition-all duration-200 ease-out
-                    ${isPlayable ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'}
-                  `}
+                  animate={newIds.has(card.id)}
+                  className={isPlayable ? 'hover:shadow-lg' : ''}
                 />
                 
                 {/* Playable indicator for mobile */}

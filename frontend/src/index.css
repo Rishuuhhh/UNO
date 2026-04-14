@@ -112,73 +112,15 @@ body {
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.2), 0 0 40px rgba(255, 255, 255, 0.1), var(--shadow-md);
 }
 
-/* Smooth Animations */
-@keyframes pulse-ring {
-  0% { 
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
-    transform: scale(1);
-  }
-  50% { 
-    box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.3);
-    transform: scale(1.02);
-  }
-  100% { 
-    box-shadow: 0 0 0 16px rgba(99, 102, 241, 0);
-    transform: scale(1);
-  }
-}
-
-@keyframes gentle-float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-4px); }
-}
-
-@keyframes card-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes turn-indicator {
-  0%, 100% { 
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% { 
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
-}
-
+/* Smooth Animations — only used for one-shot transitions */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-/* Playable Card Animation */
-.playable-card {
-  animation: pulse-ring 2s ease-in-out infinite;
-}
-
-/* Turn Indicator */
-.turn-active {
-  animation: turn-indicator 1.5s ease-in-out infinite;
-}
-
-/* Floating Animation */
-.float {
-  animation: gentle-float 3s ease-in-out infinite;
-}
-
-/* Card Shimmer Effect */
-.card-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: card-shimmer 2s ease-in-out infinite;
+@keyframes card-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 /* Mobile Optimizations */
@@ -231,16 +173,15 @@ body {
   transition: all var(--duration-normal) cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* Playable card ring */
-@keyframes playable-ring {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50%       { opacity: 1;   transform: scale(1.03); }
+/* Playable Card Highlight — CSS only, no scale animation */
+.playable-card {
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.7), 0 0 12px rgba(99, 102, 241, 0.3);
 }
 
 /* Card 3D perspective */
 .card-scene { perspective: 600px; }
 
-/* Avatar ring spin — SVG uses framer-motion but needs this for transform-box */
+/* SVG transform-box fix */
 svg circle { transform-box: fill-box; }
 
 /* Scrollbar */
