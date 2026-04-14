@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 const COLOR_MAP = {
   red: 'bg-red-500',
@@ -8,33 +9,35 @@ const COLOR_MAP = {
   wild: 'bg-gray-700',
 };
 
-/**
- * Renders a single UNO card.
- * @param {object} card - { id, color, value }
- * @param {boolean} playable - highlights the card when true
- * @param {function} onClick - called when the card is clicked
- * @param {boolean} draggable - enables drag-and-drop on desktop
- */
-export default function Card({ card, playable = false, onClick, draggable = false }) {
+export default function Card({ card, playable = false, onClick, draggable = false, animate = false }) {
   if (!card) return null;
 
   const bgColor = COLOR_MAP[card.color] ?? 'bg-gray-700';
-  const playableClasses = playable ? 'ring-4 ring-white cursor-pointer hover:scale-105' : 'cursor-default';
+  const playableClasses = playable
+    ? 'ring-4 ring-white cursor-pointer'
+    : 'cursor-default';
 
   function handleDragStart(e) {
     e.dataTransfer.setData('cardId', card.id);
   }
 
   return (
-    <div
-      className={`relative flex items-center justify-center w-16 h-24 rounded-lg text-white font-bold text-sm select-none transition-transform ${bgColor} ${playableClasses}`}
+    <motion.div
+      className={`relative flex items-center justify-center w-16 h-24 rounded-lg text-white font-bold text-sm select-none ${bgColor} ${playableClasses}`}
       onClick={playable && onClick ? () => onClick(card) : undefined}
       draggable={draggable}
       onDragStart={draggable ? handleDragStart : undefined}
       data-testid="card"
       data-card-id={card.id}
+      // entrance animation when card is added to hand
+      initial={animate ? { y: 60, opacity: 0, scale: 0.7 } : false}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+      // hover / tap only when playable
+      whileHover={playable ? { y: -12, scale: 1.08 } : {}}
+      whileTap={playable ? { scale: 0.95 } : {}}
     >
       <span className="text-center leading-tight px-1">{card.value}</span>
-    </div>
+    </motion.div>
   );
 }

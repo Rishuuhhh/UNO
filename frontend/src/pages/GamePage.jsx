@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from '../store/gameStore';
 import { useSocket } from '../hooks/useSocket';
 import GameBoard from '../components/GameBoard';
@@ -20,6 +21,8 @@ export default function GamePage() {
   const [pendingWildCard, setPendingWildCard] = useState(null);
   // Dismissible error toast
   const [toastError, setToastError] = useState(null);
+  // Incremented each draw to trigger animation
+  const [drawAnimKey, setDrawAnimKey] = useState(0);
 
   const myId = socket?.id;
 
@@ -73,6 +76,7 @@ export default function GamePage() {
 
   const handleDrawCard = useCallback(() => {
     if (!socket || !myTurn) return;
+    setDrawAnimKey((k) => k + 1);
     socket.emit('draw_card', {});
   }, [socket, myTurn]);
 
@@ -197,20 +201,37 @@ export default function GamePage() {
             <DiscardPile topCard={topCard} />
 
             {/* Draw pile button */}
-            <button
-              className="flex flex-col items-center gap-1 cursor-pointer"
-              onClick={handleDrawCard}
-              disabled={!myTurn}
-              data-testid="draw-pile"
-              aria-label="Draw a card"
-            >
-              <div className="w-16 h-24 bg-blue-900 border-2 border-blue-400 rounded-lg flex items-center justify-center text-blue-300 text-xs font-bold">
+            <div className="flex flex-col items-center gap-1 relative">
+              <motion.button
+                className="w-16 h-24 bg-blue-900 border-2 border-blue-400 rounded-lg flex items-center justify-center text-blue-300 text-xs font-bold"
+                onClick={handleDrawCard}
+                disabled={!myTurn}
+                data-testid="draw-pile"
+                aria-label="Draw a card"
+                whileHover={myTurn ? { scale: 1.08, y: -4 } : {}}
+                whileTap={myTurn ? { scale: 0.93 } : {}}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              >
                 DRAW
-              </div>
+              </motion.button>
+
+              {/* Flying card animation on draw */}
+              <AnimatePresence>
+                {drawAnimKey > 0 && (
+                  <motion.div
+                    key={drawAnimKey}
+                    className="absolute top-0 left-0 w-16 h-24 bg-blue-700 border-2 border-blue-300 rounded-lg pointer-events-none z-50"
+                    initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                    animate={{ x: 0, y: 80, opacity: 0, scale: 0.7 }}
+                    transition={{ duration: 0.35, ease: 'easeOut' }}
+                  />
+                )}
+              </AnimatePresence>
+
               <span className="text-gray-400 text-xs">
                 {gameState?.drawPile?.length ?? 0} left
               </span>
-            </button>
+            </div>
           </GameBoard>
 
           {/* Player hand at the bottom */}
